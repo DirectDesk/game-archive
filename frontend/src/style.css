@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+@theme { --color-base: #101319; --color-panel: #1b2029; --color-accent: #79c64b; }
+body { @apply m-0 min-h-screen bg-base text-slate-100; font-family: Inter, "Microsoft YaHei", sans-serif; }
+input, select, textarea { @apply w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-accent; }
+button { @apply rounded-md px-3 py-2 text-sm font-medium transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50; }
+.btn { @apply bg-accent text-slate-950; }.btn-muted { @apply bg-slate-700 text-slate-100; }.panel { @apply rounded-xl border border-slate-700 bg-panel p-4; }

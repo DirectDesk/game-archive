@@ -1,0 +1,14 @@
+services:
+  game-archive:
+    build: .
+    container_name: game-archive
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    environment:
+      RAWG_API_KEY: ${RAWG_API_KEY:-}
+    volumes:
+      # 修改左侧为飞牛本地存储中的实际目录。
+      - /vol1/1000/docker/game-archive/data:/app/data
+      # 可选：飞牛 WebDAV 挂载百度网盘的宿主路径。
+      - /vol02/1000-1-dd21201d/game_station:/vol/baidu

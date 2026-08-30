@@ -1,0 +1,94 @@
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..config import settings
+from ..database import get_db
+from ..models import Game
+from ..schemas import GameCreate, GameOut, GameUpdate
+
+router = APIRouter(prefix="/api/games", tags=["games"])
+
+
+@router.get("", response_model=list[GameOut])
+async def list_games(db: AsyncSession = Depends(get_db), q: str = "", source_type: str = "", play_status: str = "", sort: str = "updated"):
+    query = select(Game)
+    if q:
+        query = query.where(Game.title.ilike(f"%{q}%"))
+    if source_type:
+        query = query.where(Game.source_type == source_type)
+    if play_status:
+        query = query.where(Game.play_status == play_status)
+    query = query.order_by(desc(Game.rating) if sort == "rating" else desc(Game.created_at) if sort == "created" else desc(Game.updated_at))
+    return list((await db.scalars(query)).all())
+
+
+@router.post("", response_model=GameOut)
+async def create_game(payload: GameCreate, db: AsyncSession = Depends(get_db)):
+    game = Game(**payload.model_dump())
+    db.add(game)
+    await db.commit()
+    await db.refresh(game)
+    return game
+
+
+@router.get("/{game_id}", response_model=GameOut)
+async def get_game(game_id: int, db: AsyncSession = Depends(get_db)):
+    game = await db.get(Game, game_id)
+    if not game:
+        raise HTTPException(404, "游戏不存在")
+    return game
+
+
+@router.put("/{game_id}", response_model=GameOut)
+async def update_game(game_id: int, payload: GameUpdate, db: AsyncSession = Depends(get_db)):
+    game = await db.get(Game, game_id)
+    if not game:
+        raise HTTPException(404, "游戏不存在")
+    for key, value in payload.model_dump().items():
+        setattr(game, key, value)
+    await db.commit()
+    await db.refresh(game)
+    return game
+
+
+@router.delete("/{game_id}", status_code=204)
+async def delete_game(game_id: int, db: AsyncSession = Depends(get_db)):
+    game = await db.get(Game, game_id)
+    if not game:
+        raise HTTPException(404, "游戏不存在")
+    await db.delete(game)
+    await db.commit()
+
+
+@router.post("/{game_id}/cover", response_model=GameOut)
+async def upload_cover(game_id: int, file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+    game = await db.get(Game, game_id)
+    if not game:
+        raise HTTPException(404, "游戏不存在")
+    cover_dir = settings.data_dir / "covers"
+    cover_dir.mkdir(parents=True, exist_ok=True)
+    path = cover_dir / f"{game_id}_{Path(file.filename or 'cover.jpg').name}"
+    path.write_bytes(await file.read())
+    game.cover_url = f"/data/covers/{path.name}"
+    await db.commit()
+    await db.refresh(game)
+    return game
+
+
+@router.get("/{game_id}/resource")
+async def open_resource(game_id: int, db: AsyncSession = Depends(get_db)):
+    game = await db.get(Game, game_id)
+    if not game or not game.resource_url:
+        raise HTTPException(404, "该游戏没有资源")
+    if game.resource_type == "cloud_link":
+        return RedirectResponse(game.resource_url)
+    if game.resource_type == "nas_path":
+        path = Path(game.resource_url)
+        if not path.is_absolute() or not path.is_file():
+            raise HTTPException(404, "NAS 文件不存在或路径不可访问")
+        return FileResponse(path, filename=path.name)
+    raise HTTPException(400, "资源类型无效")
