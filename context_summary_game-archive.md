@@ -12,6 +12,62 @@
 - 数据目录挂载：`/vol1/1000/docker/game-archive/data:/app/data`
 - RAWG API Key 支持从 `SystemConfig.rawg_api_key`、环境变量 `RAWG_API_KEY` 或应用配置回退读取。
 
+## fnOS 登录与维护
+
+- NAS 地址：`192.168.20.10`
+- SSH 端口：`22`
+- SSH 用户：`admin`
+- SSH 登录示例：
+
+```bash
+ssh -p 22 admin@192.168.20.10
+```
+
+- 登录密码由项目维护者通过安全渠道提供，不写入本文件、Git 仓库或脚本。
+- fnOS 项目目录：`/vol1/1000/docker/game-archive`
+- Web 访问地址：`http://192.168.20.10:8080/`
+- Docker 容器名：`game-archive`
+- Compose 服务名：`game-archive`
+- 持久化数据库和应用数据：`/vol1/1000/docker/game-archive/data`
+
+### 常用维护命令
+
+```bash
+cd /vol1/1000/docker/game-archive
+
+# 查看版本和工作区
+git status --short
+
+
+# 从 GitHub 更新并部署
+git pull --ff-only origin main
+sudo docker compose build
+sudo docker compose up -d
+
+# 查看状态、实时日志和最近日志
+sudo docker compose ps
+sudo docker compose logs -f --tail=200
+sudo docker compose logs --tail=200 --no-color
+
+# 重启或停止服务
+sudo docker compose restart
+sudo docker compose down
+```
+
+### 部署注意事项
+
+- 当前已验证部署提交：`49d4ad7`。
+- `admin` 用户需要使用 `sudo` 执行 Docker 命令；若 Docker socket 报权限错误，使用 `sudo docker ...`。
+- 部署前确认 `/vol1/1000/docker/game-archive/data` 存在；更新代码时不要删除该目录。
+- 若 fnOS 无法通过 SSH 访问 GitHub，可在本地使用 `git archive` 打包已推送提交，再通过 SSH/SFTP 上传到项目目录；保留 `data` 后替换代码文件，再执行 Compose 构建。
+- 容器启动后检查：
+
+```bash
+curl -I http://127.0.0.1:8080/
+sudo docker inspect game-archive --format '{{.State.Status}} exit={{.State.ExitCode}}'
+```
+
+- 正常状态应为容器 `Up`、HTTP 返回 `200`，日志中应出现 `Application startup complete.`，且不应有 traceback 或启动异常。
 ## 已完成的修复/功能
 
 ### RAWG 与翻译
